@@ -12,6 +12,7 @@ import matplotlib.dates as mdates
 import matplotlib.pylab as pylab
 
 from sklearn.preprocessing import LabelEncoder
+from sklearn.linear_model import LinearRegression 
 
 train = pd.read_csv('train.csv')
 test = pd.read_csv('test.csv')
@@ -55,7 +56,6 @@ for raw in [item.split(' ')[0] for item in [pre for pre in train['Ticket'].value
         prefix_dict[cleaned] = raw
         cleaned_prefix.append(cleaned)
 
-print cleaned_prefix
 
 def ticket_means(prefix_list):
 	clean_means=[]
@@ -70,7 +70,7 @@ def ticket_means(prefix_list):
 x = cleaned_prefix 
 y = ticket_means(cleaned_prefix)
 # if 'Non alpha' not in cleaned_prefix:
-# 	cleaned_prefix.append('Non alpha')
+# 	x.append('Non alpha')
 
 # sns.barplot(x,y)
 # plt.show()
@@ -133,12 +133,77 @@ def PrefixSurvival(prefix_list):
 	survived_count=[]
 	for pre in prefix_list:
 		matches = [x for x in prefix_dict if prefix_dict[x]==pre]
-		survived = float(train[train['Ticket'].str.contains('|'.join(matches))]['Survived'].sum())/float(train['Survived'].count())
-		print survived
+		candidate = train['Ticket'].str
+		survived = float(train[candidate.contains('|'.join(matches))]['Survived'].sum())/float(train[candidate.contains('|'.join(matches))]['Survived'].count())
 		survived_count.append(survived)
+	survived_count.append(float(train[candidate.isdigit()]['Survived'].sum())/float(train[candidate.isdigit()]['Survived'].count()))
 	return survived_count
 
-sns.barplot(cleaned_prefix, PrefixSurvival(cleaned_prefix))
-plt.show()
 
-print trainp
+new_x = cleaned_prefix + ['Non_alpha']
+
+print PrefixSurvival(cleaned_prefix), new_x
+
+
+sns.barplot(new_x, PrefixSurvival(cleaned_prefix))
+plt.xticks(rotation=30)
+
+def golden_ticket(row):
+	golden_list = ['PC', 'PP', 'F.C', 'FC']
+	if filter(lambda x: x in row['Ticket'], golden_list):
+		return 1
+	else:
+		return 0
+	return row['Ticket'].str.contains('PC')
+
+train['Golden ticket'] = train.apply(lambda x: golden_ticket(x), axis =1 )
+test['Golden ticket'] = test.apply(lambda x: golden_ticket(x), axis =1)
+
+train = train.drop('Ticket', axis=1)
+test = test.drop('Ticket', axis=1)
+
+cabin_dict = {
+	'A': 1,
+	'B': 2,
+	'C': 3,
+	'D': 4,
+	'E': 5,
+	'F': 6,
+	'G': 7,
+	'T': 8
+}
+
+train['Cabin'] = train['Cabin'].fillna(value='G')
+test['Cabin'] = test['Cabin'].fillna(value='G')
+
+train['Cabin_ord'] = train.apply(lambda x: cabin_dict[x['Cabin'][0]], axis =1)
+test['Cabin_ord'] = test.apply(lambda x: cabin_dict[x['Cabin'][0]], axis =1)
+
+train = train.drop(['Cabin', 'PassengerId'], axis =1)
+test = test.drop(['Cabin'], axis=1)
+
+def refineName(row):
+	suffix_list = ['Mrs', 'Mr.', 'Miss', 'Master']
+	suffix = filter(lambda x: x in row['Name'], suffix_list)
+	if suffix:
+		return suffix[0]
+	else:
+		return 'Other'
+
+train['Name'] = train.apply(lambda x: refineName(x), axis=1)
+test['Name'] = test.apply(lambda x: refineName(x), axis=1)
+
+suffixes = pd.get_dummies(train['Name'])
+test_suffixed = pd.get_dummies(test['Name'])
+
+train = train.join(suffixes)
+train = train.drop('Name', axis=1)
+
+test = test.join(suffixes)
+test = test.drop('Name', axis=1)
+
+def linreg_name_age(X,y):
+	model = LinearRegression(normalize = True)
+	fiting = model.fit(X,y)
+	return fitting
+model = linreg_name_age(train[train['Mr.']>0]['Mr.'].values,train[train['Mr.']>0]['Age'].values)
