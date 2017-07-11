@@ -43,32 +43,38 @@ data_dict = pd.DataFrame({
 
 prefix_dict=OrderedDict([])
 cleaned_prefix=[]
-for raw in train['Ticket']:
-	ticket_split= raw.split(' ')
-	if len(ticket_split) >1:
-		prefix = ticket_split[0].replace("/", '').replace('.','')
-		if raw not in prefix_dict:
-			prefix_dict[raw]=prefix
-		if prefix not in cleaned_prefix:
-			cleaned_prefix.append(prefix)
 
-# Calculate the means of the tickets with the same prefix
+
+for raw in [item.split(' ')[0] for item in [pre for pre in train['Ticket'].value_counts().index.tolist() if not pre.isalnum()]]:
+    cleaned = re.sub(r'\W+', '', raw)
+    
+    if raw not in prefix_dict:
+        prefix_dict[raw] = cleaned
+        
+    if cleaned not in cleaned_prefix:
+        prefix_dict[cleaned] = raw
+        cleaned_prefix.append(cleaned)
+
+print cleaned_prefix
+
 def ticket_means(prefix_list):
 	clean_means=[]
 	for pre in prefix_list:
-		single_sum, single_length= 0,0 
 		matches = [x for x in prefix_dict if prefix_dict[x]==pre]
-		num_match = len(matches)
-		for instance in matches:
-			find_match = train[train['Ticket'].str.contains(instance)]
-			single_sum += find_match['Fare'].sum() 
-			single_length+=find_match.shape[0]
-		clean_means.append(single_sum/single_length)
-	# clean_means.append(train[train['Ticket'].str.isdigit()]['Fare'].mean())
+		before = train[train['Ticket'].str.contains("|".join(matches))]['Fare'].mean()
+		clean_means.append(before)
+	clean_means.append(train[train['Ticket'].str.isdigit()]['Fare'].mean())
 	return clean_means
+
 
 x = cleaned_prefix 
 y = ticket_means(cleaned_prefix)
+# if 'Non alpha' not in cleaned_prefix:
+# 	cleaned_prefix.append('Non alpha')
+
+# sns.barplot(x,y)
+# plt.show()
+
 
 
 def one_hot(classList, return_labels=True):
@@ -85,8 +91,54 @@ train = train.drop(['Sex', 'Embarked'], axis=1)
 train = train.join([gender, embarkation])
 train = train.rename(columns={'female':'Female', 'male':'Male', 'C':'Churberg', 'Q': 'Queenstown', 'S':'Southampton'})
 
-fig, axes = plt.subplots(5,6, figsize=(20,15))
-fig.legend_out = True
+# fig, axes = plt.subplots(5,6, figsize=(20,15))
+# fig.legend_out = True
 
-# def graphPortTickets(prefix_list):
 
+#for each prefix, graph the percentage of 
+def graphPortTickets(prefix_list):
+	col, row, loop = (0,0,0)
+	lookup=[]
+	for pre in prefix_list:
+		row = int(math.floor(loop/6))
+
+		matches = [x for x in prefix_dict if prefix_dict[x]==pre]
+		df = train[train['Ticket'].str.contains("|".join(matches))]
+		df_c = float(df['Churberg'].sum())/float(df['PassengerId'].count())
+		df_q = float(df['Queenstown'].sum())/float(df['PassengerId'].count())		
+		df_s = float(df['Southampton'].sum())/float(df['PassengerId'].count())		
+
+		x = ['Churberg', 'Queenstown', 'Southampton']
+		y = [df_c,df_q, df_s]
+		if row==4 and col==5:
+			ax = sns.barplot(x,y,hue=x,ax=axes[row,col])
+		else:
+			ax = sns.barplot(x,y,ax=axes[row,col])
+		col+=1
+		loop+=1
+		ax.set_xticks([])
+
+		if col==6:
+			col =0
+		axes[row,col].set_title('-{}- by port'.format(pre))
+
+
+
+# graphPortTickets(cleaned_prefix)
+# plt.legend(bbox_to_anchor=(1.05, 5.8), loc=2, borderaxespad=0.)
+# plt.show()
+
+
+def PrefixSurvival(prefix_list):
+	survived_count=[]
+	for pre in prefix_list:
+		matches = [x for x in prefix_dict if prefix_dict[x]==pre]
+		survived = float(train[train['Ticket'].str.contains('|'.join(matches))]['Survived'].sum())/float(train['Survived'].count())
+		print survived
+		survived_count.append(survived)
+	return survived_count
+
+sns.barplot(cleaned_prefix, PrefixSurvival(cleaned_prefix))
+plt.show()
+
+print trainp
