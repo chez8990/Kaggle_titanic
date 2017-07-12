@@ -84,13 +84,18 @@ def one_hot(classList, return_labels=True):
 		return transformed, precode.classes_
 	return transformed
 
-gender = pd.get_dummies(train['Sex']) #performs one hot
-embarkation = pd.get_dummies(train['Embarked'])
+train_gender = pd.get_dummies(train['Sex']) #performs one hot
+test_gender = pd.get_dummies(test['Sex'])
+train_embarkation = pd.get_dummies(train['Embarked'])
+test_embarkation = pd.get_dummies(test['Embarked'])
 
 train = train.drop(['Sex', 'Embarked'], axis=1)
-train = train.join([gender, embarkation])
+train = train.join([train_gender, train_embarkation])
 train = train.rename(columns={'female':'Female', 'male':'Male', 'C':'Churberg', 'Q': 'Queenstown', 'S':'Southampton'})
 
+test= test.drop(['Sex', 'Embarked'], axis=1)
+test = test.join([test_gender, test_embarkation])
+test = test.rename(columns={'female':'Female', 'male':'Male', 'C':'Churberg', 'Q': 'Queenstown', 'S':'Southampton'})
 # fig, axes = plt.subplots(5,6, figsize=(20,15))
 # fig.legend_out = True
 
@@ -142,11 +147,8 @@ def PrefixSurvival(prefix_list):
 
 new_x = cleaned_prefix + ['Non_alpha']
 
-print PrefixSurvival(cleaned_prefix), new_x
-
-
-sns.barplot(new_x, PrefixSurvival(cleaned_prefix))
-plt.xticks(rotation=30)
+# sns.barplot(new_x, PrefixSurvival(cleaned_prefix))
+# plt.xticks(rotation=30)
 
 def golden_ticket(row):
 	golden_list = ['PC', 'PP', 'F.C', 'FC']
@@ -202,8 +204,50 @@ train = train.drop('Name', axis=1)
 test = test.join(suffixes)
 test = test.drop('Name', axis=1)
 
-def linreg_name_age(X,y):
-	model = LinearRegression(normalize = True)
-	fiting = model.fit(X,y)
-	return fitting
-model = linreg_name_age(train[train['Mr.']>0]['Mr.'].values,train[train['Mr.']>0]['Age'].values)
+test['Fare'] = test['Fare'].fillna(value=0)
+
+
+#Prepareing data for regression, fill up age void
+with_age = train[train['Age']>0]
+no_age = train[train['Age'].isnull()]
+no_age = no_age.drop('Age', axis=1)
+
+test_with_age = test[test['Age']>0]
+test_no_age = test[test['Age'].isnull()].drop('Age', axis=1)
+
+#instantiate model
+train_model = LinearRegression()
+test_model = LinearRegression()
+
+train_fitted = train_model.fit(with_age.drop('Age', axis=1), with_age['Age'])
+test_fitted = test_model.fit(test_with_age.drop('Age', axis=1), test_with_age['Age'])
+
+train_prediction = train_model.predict(no_age)
+test_prediciton = test_model.predict(test_no_age)
+
+#replace null values with prediction
+no_age['Age'] = train_prediction
+test_no_age['Age'] = test_prediciton 
+
+train = with_age.append(no_age)
+test = test_with_age.append(test_no_age)
+
+# correlation heat map
+
+
+avg_fare = train['Fare'].mean()
+def rich(row):
+	if row['Fare']>= 50:
+		return 1 
+	else:
+		return 0
+
+train['Fare'] = train.apply(lambda x: rich(x), axis=1)
+
+colormap = plt.cm.viridis
+plt.figure(figsize=(15,15))
+plt.title('Feature correlations')
+sns.heatmap(train.corr(), linewidths = 0.1, vmax=1.0, cmap=colormap, annot=True, square=True)
+plt.xticks(rotation=90)
+plt.yticks(rotation=0)
+plt.show()
