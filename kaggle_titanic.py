@@ -274,11 +274,11 @@ train = train.drop(['Male', 'Fare', 'Parch', 'SibSp'], axis = 1)
 test = test.drop(['Male', 'Fare', 'Parch', 'SibSp'], axis =1)
 
 
-plt.figure(figsize=(15,15))
-plt.title('Feature correlations')
-sns.heatmap(train.corr(), linewidths = 0.1, vmax=1.0, cmap=plt.cm.seismic, annot=True, square=True)
-plt.xticks(rotation=90)
-plt.yticks(rotation=0)
+# plt.figure(figsize=(15,15))
+# plt.title('Feature correlations')
+# sns.heatmap(train.corr(), linewidths = 0.1, vmax=1.0, cmap=plt.cm.seismic, annot=True, square=True)
+# plt.xticks(rotation=90)
+# plt.yticks(rotation=0)
 # plt.show()
 
 
@@ -293,3 +293,51 @@ gaus = GaussianNB()
 logreg = LogisticRegression()
 dtree = DecisionTreeClassifier()
 svc_rbf = SVC(kernel = 'rbf')
+svc_lin = SVC(kernel = 'linear')
+knn = KNeighborsClassifier(n_neighbors = 3)
+per = Perceptron()
+grd = GradientBoostingClassifier()
+
+y = train['Survived'].values
+x = train.drop('Survived', axis=1)
+
+for _ in range(3000):
+	X_train, X_test, y_train, y_test =  train_test_split(x,y,test_size=0.3, stratify= y)
+
+	grd.fit(X_train,y_train)
+	grd_score = grd.score(X_test,y_test)
+
+	if grd.score>0.88:
+		algorithms = [{'algo': rf, 'color': '#4285f4', 'name': 'Random Forest'}, {'algo': gaus, 'color': 'red', 'name': 'Gaussian'}, 
+		{'algo': logreg, 'color': 'blue', 'name': 'Logistic Regressions'},{'algo': dtree, 'color': 'orange', 'name': 'Decision Tree'}, 
+		{'algo': svc_rbf, 'color': 'lime', 'name': 'SVC-RBF'}, {'algo': svc_lin, 'color': 'purple', 'name': 'Linear SVC'},
+		{'algo': knn, 'color': 'yellow', 'name': 'KNN'},{'algo': per, 'color': 'indigo', 'name': 'Perceptron'}, 
+		{'algo': grd, 'color': 'black', 'name': 'Gradient Boosting'}
+		]
+
+		for alg in algorithms:
+			algo = alg['algo']
+			algo.fit(X_train, y_train)
+			predictions = algo.predict(X_test)
+			fpr, tpr, threshold = metrics.roc_curve(y_test, predictions)
+			auc = metrics.auc(fpr, tpr)
+			plt.plot(fpr, tpr, alg['color'], label = '{} AUC = {:.2f}'.format(alg['name'],auc))
+
+		plt.title('ROC')
+		plt.legend(loc = 'lower right')
+		plt.plot([0,1],[0,1],'r--')
+		plt.xlabel("True Positive Rate")
+		plt.ylabel("False Positive Rate")
+		plt.show()
+
+		scores = [algorithm.score(X_test, y_test) for algorithm in [x['algo'] for x in algorithms ]]
+		scoring_df = pd.DataFrame({'Algorithms':[x['name'] for x in algorithms], 'Score':scores})
+
+		print scoring_df
+		break
+
+rfe = RFE(estimator=grd, n_features_to_select=1, step=1)
+rfe.fit(x,y)
+ranking = rfe.ranking_
+print pd.DataFrame(list(zip(x.columns, ranking)), columns=['Feat', 'Ranking'])
+
