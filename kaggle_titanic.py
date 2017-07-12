@@ -14,6 +14,18 @@ import matplotlib.pylab as pylab
 from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LinearRegression 
 
+from sklearn import datasets, tree
+from sklearn.preprocessing import LabelEncoder
+from sklearn.neighbors import KNeighborsClassifier 
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix, roc_curve, auc
+from sklearn.linear_model import LogisticRegression, LinearRegression
+from sklearn.feature_selection import SelectKBest, chi2, VarianceThreshold, RFE
+from sklearn.svm import SVC
+from sklearn.cross_validation import train_test_split
+from sklearn import cross_validation, metrics   #Additional scklearn functions
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+
 train = pd.read_csv('train.csv')
 test = pd.read_csv('test.csv')
 
@@ -235,19 +247,49 @@ test = test_with_age.append(test_no_age)
 # correlation heat map
 
 
-avg_fare = train['Fare'].mean()
+
 def rich(row):
 	if row['Fare']>= 50:
 		return 1 
 	else:
 		return 0
 
-train['Fare'] = train.apply(lambda x: rich(x), axis=1)
+def isKid(row):
+	if row['Age']<=6:
+		return 1
+	else:
+		return 0
+def hasFam(row):
+	if row['SibSp']>0 or row['Parch']>0:
+		return 1
 
-colormap = plt.cm.viridis
+	else:
+		return 0
+
+train['Rich'] = train.apply(lambda x: rich(x), axis=1)
+train['isKid'] = train.apply(lambda x: isKid(x), axis=1)
+train['hasFam'] = train.apply(lambda x: hasFam(x), axis=1)
+
+train = train.drop(['Male', 'Fare', 'Parch', 'SibSp'], axis = 1)
+test = test.drop(['Male', 'Fare', 'Parch', 'SibSp'], axis =1)
+
+
 plt.figure(figsize=(15,15))
 plt.title('Feature correlations')
-sns.heatmap(train.corr(), linewidths = 0.1, vmax=1.0, cmap=colormap, annot=True, square=True)
+sns.heatmap(train.corr(), linewidths = 0.1, vmax=1.0, cmap=plt.cm.seismic, annot=True, square=True)
 plt.xticks(rotation=90)
 plt.yticks(rotation=0)
-plt.show()
+# plt.show()
+
+
+from sklearn import metrics
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.linear_model import Perceptron, SGDClassifier
+from sklearn.model_selection import GridSearchCV
+
+rf = RandomForestClassifier(n_estimators = 1000)
+gaus = GaussianNB()
+logreg = LogisticRegression()
+dtree = DecisionTreeClassifier()
+svc_rbf = SVC(kernel = 'rbf')
